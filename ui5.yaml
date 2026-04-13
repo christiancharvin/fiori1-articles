@@ -1,0 +1,24 @@
+specVersion: "3.0"
+metadata:
+  name: com.articles.search
+type: application
+framework:
+  name: SAPUI5
+  version: "1.120.0"
+  libraries:
+    - name: sap.m
+    - name: sap.f
+    - name: sap.ui.core
+    - name: sap.ui.layout
+    - name: themelib_sap_horizon
+
+server:
+  customMiddleware:
+    - name: ui5-middleware-simpleproxy
+      afterMiddleware: compression
+      mountPath: /sap/opu/odata/sap/API_PRODUCT_SRV
+      configuration:
+        baseUri: "https://my300448-api.s4hana.ondemand.com/sap/opu/odata/sap/API_PRODUCT_SRV"
+        strictSSL: false
+        username: CC01
+        password: "{wD~Vhob\\UMFX#L[q}SSUbU{n9C#U-dWu%sP=d<B"
