@@ -22,3 +22,11 @@ server:
         strictSSL: false
         username: CC01
         password: "{wD~Vhob\\UMFX#L[q}SSUbU{n9C#U-dWu%sP=d<B"
+    - name: ui5-middleware-simpleproxy
+      afterMiddleware: compression
+      mountPath: /sap/opu/odata/sap/API_MATERIAL_STOCK_SRV
+      configuration:
+        baseUri: "https://my300448-api.s4hana.ondemand.com/sap/opu/odata/sap/API_MATERIAL_STOCK_SRV"
+        strictSSL: false
+        username: CC01
+        password: "{wD~Vhob\\UMFX#L[q}SSUbU{n9C#U-dWu%sP=d<B"

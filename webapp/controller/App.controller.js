@@ -89,6 +89,8 @@ sap.ui.define([
           oModel.setProperty("/results", aResults);
           oModel.setProperty("/totalCount", aResults.length);
           oTable.setBusy(false);
+          // Scroller vers le tableau des résultats
+          this.byId("resultsTable").getDomRef() && this.byId("resultsTable").getDomRef().scrollIntoView({ behavior: "smooth" });
         }.bind(this))
         .catch(function (e) {
           oTable.setBusy(false);
@@ -120,18 +122,42 @@ sap.ui.define([
 
     _loadPlants: function (sProduct) {
       var oPlantModel = this.getView().getModel("plantModel");
-      var sUrl = BASE_URL + "/A_ProductSupplyPlanning" +
+
+      var sUrlPlants = BASE_URL + "/A_ProductSupplyPlanning" +
         "?$format=json&$orderby=Plant asc" +
         "&$filter=" + encodeURIComponent("Product eq '" + sProduct + "'") +
         "&$select=Product,Plant,MRPType,LotSizingProcedure";
 
-      fetch(sUrl, { headers: { Accept: "application/json" } })
-        .then(function (r) {
-          if (!r.ok) { throw new Error("HTTP " + r.status); }
-          return r.json();
-        })
-        .then(function (oData) {
-          var aPlants = (oData.d && oData.d.results) ? oData.d.results : [];
+      var sUrlStock = "/sap/opu/odata/sap/API_MATERIAL_STOCK_SRV/A_MatlStkInAcctMod" +
+        "?$format=json" +
+        "&$filter=" + encodeURIComponent("Material eq '" + sProduct + "'") +
+        "&$select=Material,Plant,MatlWrhsStkQtyInMatlBaseUnit,MaterialBaseUnit";
+
+      Promise.all([
+        fetch(sUrlPlants, { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }),
+        fetch(sUrlStock,  { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); })
+      ])
+        .then(function (aResults) {
+          var aPlants = (aResults[0].d && aResults[0].d.results) ? aResults[0].d.results : [];
+          var aStock  = (aResults[1].d && aResults[1].d.results) ? aResults[1].d.results : [];
+
+          // Agréger le stock par division (somme de toutes les lignes)
+          var mStock = {};
+          var mUnit  = {};
+          aStock.forEach(function (o) {
+            if (!mStock[o.Plant]) { mStock[o.Plant] = 0; mUnit[o.Plant] = o.MaterialBaseUnit; }
+            mStock[o.Plant] += parseFloat(o.MatlWrhsStkQtyInMatlBaseUnit) || 0;
+          });
+
+          // Enrichir chaque division avec le stock
+          aPlants.forEach(function (o) {
+            o.Stock     = mStock[o.Plant] !== undefined ? mStock[o.Plant] : null;
+            o.StockUnit = mUnit[o.Plant] || "";
+            o.StockText = o.Stock !== null
+              ? (Number.isInteger(o.Stock) ? o.Stock : o.Stock.toFixed(3)) + " " + o.StockUnit
+              : "—";
+          });
+
           oPlantModel.setProperty("/plants", aPlants);
           oPlantModel.setProperty("/loading", false);
         })
@@ -152,40 +178,120 @@ sap.ui.define([
       }
 
       var oResult = Analyzer.analyze(aResults);
-
       var oAM = this.getView().getModel("analysisModel");
-      oAM.setProperty("/totalAnalyzed", oResult.totalAnalyzed);
-      oAM.setProperty("/generics",      oResult.generics);
-      oAM.setProperty("/similar",       oResult.similar);
-      oAM.setProperty("/variants",      oResult.variants);
-      oAM.setProperty("/duplicates",    oResult.duplicates);
-      oAM.setProperty("/hasGenerics",   oResult.generics.length > 0);
-      oAM.setProperty("/hasSimilar",    oResult.similar.length > 0);
-      oAM.setProperty("/hasVariants",   oResult.variants.length > 0);
-      oAM.setProperty("/hasDuplicates", oResult.duplicates.length > 0);
 
-      // Détruire la dialog précédente pour prendre le nouveau fragment
-      if (this._oAnalysisDialog) {
-        this._oAnalysisDialog.destroy();
-        this._oAnalysisDialog = null;
-        this._oAnalysisDialogPromise = null;
-      }
-
-      if (!this._oAnalysisDialogPromise) {
-        this._oAnalysisDialogPromise = Fragment.load({
-          id: this.getView().getId(),
-          name: "com.articles.search.view.AnalysisDialog",
-          controller: this
-        }).then(function (oDialog) {
-          this.getView().addDependent(oDialog);
-          this._oAnalysisDialog = oDialog;
-          return oDialog;
-        }.bind(this));
-      }
-
-      this._oAnalysisDialogPromise.then(function (oDialog) {
-        oDialog.open();
+      // Collecter les articles uniques en doublon
+      var mProducts = {};
+      oResult.duplicates.forEach(function (p) {
+        mProducts[p.a.product] = true;
+        mProducts[p.b.product] = true;
       });
+      var aProducts = Object.keys(mProducts);
+
+      // Charger stock ET valorisation pour chaque article doublon en parallèle
+      var aStockPromises = aProducts.map(function (sProduct) {
+        var sUrlStock = "/sap/opu/odata/sap/API_MATERIAL_STOCK_SRV/A_MatlStkInAcctMod" +
+          "?$format=json" +
+          "&$filter=" + encodeURIComponent("Material eq '" + sProduct + "'") +
+          "&$select=Material,Plant,MatlWrhsStkQtyInMatlBaseUnit,MaterialBaseUnit";
+
+        var sUrlVal = BASE_URL + "/A_ProductValuation" +
+          "?$format=json" +
+          "&$filter=" + encodeURIComponent("Product eq '" + sProduct + "'") +
+          "&$select=Product,ValuationArea,MovingAveragePrice,StandardPrice,PriceUnitQty,Currency";
+
+        return Promise.all([
+          fetch(sUrlStock, { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }),
+          fetch(sUrlVal,   { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); })
+        ]).then(function (aRes) {
+          var aLines  = (aRes[0].d && aRes[0].d.results) ? aRes[0].d.results : [];
+          var aValLines = (aRes[1].d && aRes[1].d.results) ? aRes[1].d.results : [];
+
+          // Stock par division
+          var mStock = {}, mUnit = {};
+          aLines.forEach(function (o) {
+            if (!mStock[o.Plant]) { mStock[o.Plant] = 0; mUnit[o.Plant] = o.MaterialBaseUnit; }
+            mStock[o.Plant] += parseFloat(o.MatlWrhsStkQtyInMatlBaseUnit) || 0;
+          });
+
+          // Prix par division (préférer prix moyen mobile, sinon prix standard)
+          var mPrice = {}, mCurrency = {};
+          aValLines.forEach(function (o) {
+            var price = parseFloat(o.MovingAveragePrice) || parseFloat(o.StandardPrice) || 0;
+            var unit  = parseFloat(o.PriceUnitQty) || 1;
+            mPrice[o.ValuationArea]    = unit > 0 ? price / unit : 0;
+            mCurrency[o.ValuationArea] = o.Currency;
+          });
+
+          return { product: sProduct, stock: mStock, unit: mUnit, price: mPrice, currency: mCurrency };
+        }).catch(function () {
+          return { product: sProduct, stock: {}, unit: {}, price: {}, currency: {} };
+        });
+      });
+
+      Promise.all(aStockPromises).then(function (aStockData) {
+        // Construire un index global product -> { plant -> { stockText, valueText } }
+        var mAllStock = {};
+        aStockData.forEach(function (o) {
+          mAllStock[o.product] = {};
+          Object.keys(o.stock).forEach(function (sPlant) {
+            var qty      = o.stock[sPlant];
+            var price    = o.price[sPlant] || 0;
+            var currency = o.currency[sPlant] || "";
+            var value    = qty * price;
+            var qtyText  = (Number.isInteger(qty) ? qty : qty.toFixed(3)) + " " + (o.unit[sPlant] || "");
+            var valText  = price > 0
+              ? value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency
+              : "—";
+            mAllStock[o.product][sPlant] = { qtyText: qtyText, valText: valText };
+          });
+        });
+
+        // Enrichir chaque paire de doublons
+        oResult.duplicates.forEach(function (p) {
+          p.a.plants = mAllStock[p.a.product] || {};
+          p.b.plants = mAllStock[p.b.product] || {};
+          p.a.stockSummary = Object.keys(p.a.plants).map(function (pl) {
+            return pl + ": " + p.a.plants[pl].qtyText + " (" + p.a.plants[pl].valText + ")";
+          }).join(" | ") || "—";
+          p.b.stockSummary = Object.keys(p.b.plants).map(function (pl) {
+            return pl + ": " + p.b.plants[pl].qtyText + " (" + p.b.plants[pl].valText + ")";
+          }).join(" | ") || "—";
+        });
+
+        oAM.setProperty("/totalAnalyzed", oResult.totalAnalyzed);
+        oAM.setProperty("/generics",      oResult.generics);
+        oAM.setProperty("/similar",       oResult.similar);
+        oAM.setProperty("/variants",      oResult.variants);
+        oAM.setProperty("/duplicates",    oResult.duplicates);
+        oAM.setProperty("/hasGenerics",   oResult.generics.length > 0);
+        oAM.setProperty("/hasSimilar",    oResult.similar.length > 0);
+        oAM.setProperty("/hasVariants",   oResult.variants.length > 0);
+        oAM.setProperty("/hasDuplicates", oResult.duplicates.length > 0);
+
+        // Détruire la dialog précédente
+        if (this._oAnalysisDialog) {
+          this._oAnalysisDialog.destroy();
+          this._oAnalysisDialog = null;
+          this._oAnalysisDialogPromise = null;
+        }
+
+        if (!this._oAnalysisDialogPromise) {
+          this._oAnalysisDialogPromise = Fragment.load({
+            id: this.getView().getId(),
+            name: "com.articles.search.view.AnalysisDialog",
+            controller: this
+          }).then(function (oDialog) {
+            this.getView().addDependent(oDialog);
+            this._oAnalysisDialog = oDialog;
+            return oDialog;
+          }.bind(this));
+        }
+
+        this._oAnalysisDialogPromise.then(function (oDialog) {
+          oDialog.open();
+        });
+      }.bind(this));
     },
 
     onCloseAnalysis: function () {

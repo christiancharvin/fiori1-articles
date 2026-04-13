@@ -137,7 +137,8 @@
               <columns>
                 <Column width="8rem"><Text text="{i18n>colPlant}" /></Column>
                 <Column width="10rem"><Text text="{i18n>colMRPType}" /></Column>
-                <Column><Text text="{i18n>colLotSize}" /></Column>
+                <Column width="10rem"><Text text="{i18n>colLotSize}" /></Column>
+                <Column width="8rem" hAlign="End"><Text text="{i18n>colStock}" /></Column>
                 <Column width="6rem" hAlign="End" />
               </columns>
               <items>
@@ -146,12 +147,11 @@
                     <ObjectStatus text="{plantModel>Plant}" state="Success" />
                     <Text text="{plantModel>MRPType}" />
                     <Text text="{plantModel>LotSizingProcedure}" />
-                    <Button
-                      icon="sap-icon://edit"
-                      type="Transparent"
-                      tooltip="{i18n>edit}"
-                      press=".onEditPlant"
+                    <ObjectNumber
+                      number="{plantModel>StockText}"
+                      state="{= ${plantModel>Stock} > 0 ? 'Success' : ${plantModel>Stock} === 0 ? 'Error' : 'None'}"
                     />
+                    <Button icon="sap-icon://edit" type="Transparent" tooltip="{i18n>edit}" press=".onEditPlant" />
                   </cells>
                 </ColumnListItem>
               </items>

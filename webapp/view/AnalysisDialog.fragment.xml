@@ -112,10 +112,12 @@
                       <VBox class="sapUiSmallMarginEnd" width="50%">
                         <Label text="{analysisModel>a/product}" design="Bold" />
                         <Text text="{analysisModel>a/description}" />
+                        <ObjectStatus text="{analysisModel>a/stockSummary}" icon="sap-icon://product" state="Information" class="sapUiTinyMarginTop" />
                       </VBox>
                       <VBox width="50%">
                         <Label text="{analysisModel>b/product}" design="Bold" />
                         <Text text="{analysisModel>b/description}" />
+                        <ObjectStatus text="{analysisModel>b/stockSummary}" icon="sap-icon://product" state="Information" class="sapUiTinyMarginTop" />
                       </VBox>
                     </HBox>
                   </VBox>
