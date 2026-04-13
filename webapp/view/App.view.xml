@@ -72,6 +72,14 @@
         <Toolbar visible="{= ${viewModel>/totalCount} >= 0}" style="Clear">
           <Title text="{parts:[{path:'viewModel>/totalCount'}], formatter:'.formatResultCount'}" level="H5" />
           <ToolbarSpacer />
+          <Button
+            icon="sap-icon://ai"
+            text="Analyse IA"
+            type="Ghost"
+            press=".onAnalyze"
+            visible="{= ${viewModel>/totalCount} > 1}"
+            tooltip="Analyser les désignations"
+          />
           <Button icon="sap-icon://excel-attachment" text="{i18n>export}" press=".onExport"
             visible="{= ${viewModel>/totalCount} > 0}" />
         </Toolbar>

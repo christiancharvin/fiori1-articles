@@ -8,8 +8,10 @@ sap.ui.define([
   "sap/m/VBox",
   "sap/m/Label",
   "sap/m/Input",
-  "sap/m/Text"
-], function (Controller, JSONModel, MessageToast, MessageBox, Dialog, Button, VBox, Label, Input, Text) {
+  "sap/m/Text",
+  "sap/ui/core/Fragment",
+  "com/articles/search/util/ArticleAnalyzer"
+], function (Controller, JSONModel, MessageToast, MessageBox, Dialog, Button, VBox, Label, Input, Text, Fragment, Analyzer) {
   "use strict";
 
   const BASE_URL = "/sap/opu/odata/sap/API_PRODUCT_SRV";
@@ -34,6 +36,20 @@ sap.ui.define([
         loading: false
       }), "plantModel");
 
+      this.getView().setModel(new JSONModel({
+        totalAnalyzed: 0,
+        generics:    [],
+        similar:     [],
+        variants:    [],
+        duplicates:  [],
+        hasGenerics:   false,
+        hasSimilar:    false,
+        hasVariants:   false,
+        hasDuplicates: false
+      }), "analysisModel");
+
+      this._oAnalysisDialogPromise = null;
+      this._oAnalysisDialog = null;
       this._oEditDialog = null;
     },
 
@@ -126,14 +142,74 @@ sap.ui.define([
     },
 
     // --------------------------------------------------------
-    // Ouvrir la dialog de modification
+    // Analyse IA locale
+    // --------------------------------------------------------
+    onAnalyze: function () {
+      var aResults = this.getView().getModel("viewModel").getProperty("/results");
+      if (!aResults || aResults.length === 0) {
+        MessageToast.show(this._i18n("msgNoDataAnalyze"));
+        return;
+      }
+
+      var oResult = Analyzer.analyze(aResults);
+
+      var oAM = this.getView().getModel("analysisModel");
+      oAM.setProperty("/totalAnalyzed", oResult.totalAnalyzed);
+      oAM.setProperty("/generics",      oResult.generics);
+      oAM.setProperty("/similar",       oResult.similar);
+      oAM.setProperty("/variants",      oResult.variants);
+      oAM.setProperty("/duplicates",    oResult.duplicates);
+      oAM.setProperty("/hasGenerics",   oResult.generics.length > 0);
+      oAM.setProperty("/hasSimilar",    oResult.similar.length > 0);
+      oAM.setProperty("/hasVariants",   oResult.variants.length > 0);
+      oAM.setProperty("/hasDuplicates", oResult.duplicates.length > 0);
+
+      // Détruire la dialog précédente pour prendre le nouveau fragment
+      if (this._oAnalysisDialog) {
+        this._oAnalysisDialog.destroy();
+        this._oAnalysisDialog = null;
+        this._oAnalysisDialogPromise = null;
+      }
+
+      if (!this._oAnalysisDialogPromise) {
+        this._oAnalysisDialogPromise = Fragment.load({
+          id: this.getView().getId(),
+          name: "com.articles.search.view.AnalysisDialog",
+          controller: this
+        }).then(function (oDialog) {
+          this.getView().addDependent(oDialog);
+          this._oAnalysisDialog = oDialog;
+          return oDialog;
+        }.bind(this));
+      }
+
+      this._oAnalysisDialogPromise.then(function (oDialog) {
+        oDialog.open();
+      });
+    },
+
+    onCloseAnalysis: function () {
+      if (this._oAnalysisDialog) {
+        this._oAnalysisDialog.close();
+      }
+    },
+
+    formatPairText: function (oPair) {
+      if (!oPair) { return ""; }
+      var iPct = Math.round((oPair.score || 0) * 100);
+      return oPair.a.product + " « " + oPair.a.description + " »\n" +
+             oPair.b.product + " « " + oPair.b.description + " »\n" +
+             "Similarité : " + iPct + "%";
+    },
+
+    // --------------------------------------------------------
+    // Modifier une division
     // --------------------------------------------------------
     onEditPlant: function (oEvent) {
       var oItem    = oEvent.getSource().getParent();
       var oCtx     = oItem.getBindingContext("plantModel");
       var oPlant   = oCtx.getObject();
 
-      // Modèle temporaire pour la dialog
       var oEditModel = new JSONModel({
         Product:            oPlant.Product,
         Plant:              oPlant.Plant,
@@ -153,28 +229,19 @@ sap.ui.define([
 
     _createEditDialog: function () {
       var that = this;
-
       return new Dialog({
         title: "{editModel>/Product} / {editModel>/Plant}",
         contentWidth: "25rem",
         content: [
-          new VBox({ class: "sapUiSmallMarginBeginEnd sapUiSmallMarginTopBottom" }).addItem(
-            new Label({ text: that._i18n("colMRPType"), labelFor: "mrpTypeInput" })
-          ).addItem(
-            new Input("mrpTypeInput", {
-              value: "{editModel>/MRPType}",
-              maxLength: 2,
-              placeholder: "ex: PD, VB, ND..."
-            })
-          ).addItem(
-            new Label({ text: that._i18n("colLotSize"), labelFor: "lotSizeInput" })
-          ).addItem(
-            new Input("lotSizeInput", {
-              value: "{editModel>/LotSizingProcedure}",
-              maxLength: 2,
-              placeholder: "ex: EX, FX, HB..."
-            })
-          )
+          new VBox({ class: "sapUiSmallMarginBeginEnd sapUiSmallMarginTopBottom" })
+            .addItem(new Label({ text: that._i18n("colMRPType"), labelFor: "mrpTypeInput" }))
+            .addItem(new Input("mrpTypeInput", {
+              value: "{editModel>/MRPType}", maxLength: 2, placeholder: "ex: PD, VB, ND..."
+            }))
+            .addItem(new Label({ text: that._i18n("colLotSize"), labelFor: "lotSizeInput" }))
+            .addItem(new Input("lotSizeInput", {
+              value: "{editModel>/LotSizingProcedure}", maxLength: 2, placeholder: "ex: EX, FX, HB..."
+            }))
         ],
         beginButton: new Button({
           type: "Emphasized",
@@ -189,15 +256,12 @@ sap.ui.define([
       });
     },
 
-    // --------------------------------------------------------
-    // Sauvegarde PATCH avec token CSRF
-    // --------------------------------------------------------
     _onSavePlant: function () {
-      var oEditModel  = this._oEditDialog.getModel("editModel");
-      var sProduct    = oEditModel.getProperty("/Product");
-      var sPlant      = oEditModel.getProperty("/Plant");
-      var sMRPType    = (oEditModel.getProperty("/MRPType") || "").trim().toUpperCase();
-      var sLotSize    = (oEditModel.getProperty("/LotSizingProcedure") || "").trim().toUpperCase();
+      var oEditModel = this._oEditDialog.getModel("editModel");
+      var sProduct   = oEditModel.getProperty("/Product");
+      var sPlant     = oEditModel.getProperty("/Plant");
+      var sMRPType   = (oEditModel.getProperty("/MRPType") || "").trim().toUpperCase();
+      var sLotSize   = (oEditModel.getProperty("/LotSizingProcedure") || "").trim().toUpperCase();
 
       oEditModel.setProperty("/saving", true);
 
@@ -205,7 +269,6 @@ sap.ui.define([
         "/A_ProductSupplyPlanning(Product='" + encodeURIComponent(sProduct) +
         "',Plant='" + encodeURIComponent(sPlant) + "')";
 
-      // Étape 1 : fetch du token CSRF
       fetch(BASE_URL + "/", {
         method: "GET",
         headers: { "x-csrf-token": "fetch", Accept: "application/json" }
@@ -216,7 +279,6 @@ sap.ui.define([
           return sToken;
         })
         .then(function (sToken) {
-          // Étape 2 : PATCH
           return fetch(sEntityUrl, {
             method: "PATCH",
             headers: {
@@ -224,10 +286,7 @@ sap.ui.define([
               "Accept":       "application/json",
               "x-csrf-token": sToken
             },
-            body: JSON.stringify({
-              MRPType:            sMRPType,
-              LotSizingProcedure: sLotSize
-            })
+            body: JSON.stringify({ MRPType: sMRPType, LotSizingProcedure: sLotSize })
           });
         })
         .then(function (r) {
@@ -235,7 +294,6 @@ sap.ui.define([
           oEditModel.setProperty("/saving", false);
           this._oEditDialog.close();
           MessageToast.show(this._i18n("msgSaveSuccess"));
-          // Recharger les divisions
           this._loadPlants(sProduct);
         }.bind(this))
         .catch(function (e) {
@@ -261,19 +319,15 @@ sap.ui.define([
     // Export CSV
     // --------------------------------------------------------
     onExport: function () {
-      var oVM      = this.getView().getModel("viewModel");
-      var aResults = oVM.getProperty("/results");
-
+      var aResults = this.getView().getModel("viewModel").getProperty("/results");
       if (!aResults || aResults.length === 0) {
         MessageToast.show(this._i18n("msgNoDataExport"));
         return;
       }
-
       var sHeader  = "Code Article;Désignation;Langue\n";
       var sRows    = aResults.map(function (o) {
         return o.Product + ";" + (o.ProductDescription || "").replace(/;/g, ",") + ";" + o.Language;
       }).join("\n");
-
       var sContent = "\uFEFF" + sHeader + sRows;
       var oBlob    = new Blob([sContent], { type: "text/csv;charset=utf-8;" });
       var sLink    = URL.createObjectURL(oBlob);

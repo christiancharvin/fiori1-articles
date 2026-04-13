@@ -1,0 +1,134 @@
+<core:FragmentDefinition
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core"
+>
+  <Dialog
+    title="Analyse IA des désignations"
+    contentWidth="50rem"
+    contentHeight="70vh"
+    resizable="true"
+    draggable="true"
+    stretch="{device>/system/phone}"
+  >
+    <customHeader>
+      <Bar>
+        <contentLeft>
+          <Title text="Analyse — {analysisModel>/totalAnalyzed} articles" level="H2" />
+        </contentLeft>
+        <contentRight>
+          <Button icon="sap-icon://decline" type="Transparent" press=".onCloseAnalysis" />
+        </contentRight>
+      </Bar>
+    </customHeader>
+    <content>
+      <IconTabBar expandable="false" stretchContentHeight="true">
+        <items>
+
+          <!-- 1. GÉNÉRIQUES -->
+          <IconTabFilter icon="sap-icon://warning" iconColor="Critical"
+            text="Génériques" count="{= ${analysisModel>/generics}.length + ''}">
+            <VBox class="sapUiSmallMargin">
+              <MessageStrip visible="{= !${analysisModel>/hasGenerics} }"
+                text="Aucune désignation générique détectée." type="Success" showIcon="true" />
+              <List visible="{analysisModel>/hasGenerics}" items="{analysisModel>/generics}">
+                <StandardListItem
+                  title="{analysisModel>product}"
+                  description="{analysisModel>description}"
+                  icon="sap-icon://warning" iconInset="false" highlight="Warning"
+                />
+              </List>
+            </VBox>
+          </IconTabFilter>
+
+          <!-- 2. SIMILAIRES -->
+          <IconTabFilter icon="sap-icon://overlap" iconColor="Critical"
+            text="Similaires" count="{= ${analysisModel>/similar}.length + ''}">
+            <VBox class="sapUiSmallMargin">
+              <MessageStrip visible="{= !${analysisModel>/hasSimilar} }"
+                text="Aucune désignation similaire détectée." type="Success" showIcon="true" />
+              <List visible="{analysisModel>/hasSimilar}" items="{analysisModel>/similar}">
+                <CustomListItem highlight="Warning">
+                  <VBox class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
+                    <ObjectStatus
+                      text="{= Math.round(${analysisModel>score} * 100) + '% de similarité'}"
+                      state="Warning" icon="sap-icon://overlap" />
+                    <HBox wrap="Wrap" class="sapUiTinyMarginTop">
+                      <VBox class="sapUiSmallMarginEnd" width="50%">
+                        <Label text="{analysisModel>a/product}" design="Bold" />
+                        <Text text="{analysisModel>a/description}" />
+                      </VBox>
+                      <VBox width="50%">
+                        <Label text="{analysisModel>b/product}" design="Bold" />
+                        <Text text="{analysisModel>b/description}" />
+                      </VBox>
+                    </HBox>
+                  </VBox>
+                </CustomListItem>
+              </List>
+            </VBox>
+          </IconTabFilter>
+
+          <!-- 3. VARIANTES -->
+          <IconTabFilter icon="sap-icon://split" iconColor="Default"
+            text="Variantes" count="{= ${analysisModel>/variants}.length + ''}">
+            <VBox class="sapUiSmallMargin">
+              <MessageStrip visible="{= !${analysisModel>/hasVariants} }"
+                text="Aucune variante détectée." type="Success" showIcon="true" />
+              <MessageStrip visible="{analysisModel>/hasVariants}"
+                text="Ces articles ont des désignations identiques à un chiffre près — probablement des variantes d'un même produit."
+                type="Information" showIcon="true" class="sapUiSmallMarginBottom" />
+              <List visible="{analysisModel>/hasVariants}" items="{analysisModel>/variants}">
+                <CustomListItem highlight="Information">
+                  <VBox class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
+                    <HBox wrap="Wrap">
+                      <VBox class="sapUiSmallMarginEnd" width="50%">
+                        <Label text="{analysisModel>a/product}" design="Bold" />
+                        <Text text="{analysisModel>a/description}" />
+                      </VBox>
+                      <VBox width="50%">
+                        <Label text="{analysisModel>b/product}" design="Bold" />
+                        <Text text="{analysisModel>b/description}" />
+                      </VBox>
+                    </HBox>
+                  </VBox>
+                </CustomListItem>
+              </List>
+            </VBox>
+          </IconTabFilter>
+
+          <!-- 4. DOUBLONS -->
+          <IconTabFilter icon="sap-icon://copy" iconColor="Negative"
+            text="Doublons" count="{= ${analysisModel>/duplicates}.length + ''}">
+            <VBox class="sapUiSmallMargin">
+              <MessageStrip visible="{= !${analysisModel>/hasDuplicates} }"
+                text="Aucun doublon détecté." type="Success" showIcon="true" />
+              <List visible="{analysisModel>/hasDuplicates}" items="{analysisModel>/duplicates}">
+                <CustomListItem highlight="Error">
+                  <VBox class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom">
+                    <ObjectStatus
+                      text="{= ${analysisModel>reason} === 'identical' ? 'Descriptions identiques' : 'Très similaires (' + Math.round(${analysisModel>score} * 100) + '%)'}"
+                      state="Error" icon="sap-icon://copy" />
+                    <HBox wrap="Wrap" class="sapUiTinyMarginTop">
+                      <VBox class="sapUiSmallMarginEnd" width="50%">
+                        <Label text="{analysisModel>a/product}" design="Bold" />
+                        <Text text="{analysisModel>a/description}" />
+                      </VBox>
+                      <VBox width="50%">
+                        <Label text="{analysisModel>b/product}" design="Bold" />
+                        <Text text="{analysisModel>b/description}" />
+                      </VBox>
+                    </HBox>
+                  </VBox>
+                </CustomListItem>
+              </List>
+            </VBox>
+          </IconTabFilter>
+
+        </items>
+      </IconTabBar>
+    </content>
+    <buttons>
+      <Button text="Fermer" press=".onCloseAnalysis" />
+    </buttons>
+  </Dialog>
+</core:FragmentDefinition>
