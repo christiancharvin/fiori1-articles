@@ -6,140 +6,150 @@
   xmlns:core="sap.ui.core"
   controllerName="com.articles.search.controller.App"
   displayBlock="true"
+  height="100%"
 >
-  <f:DynamicPage id="dynamicPage" headerExpanded="true" toggleHeaderOnTitleClick="true">
+  <f:FlexibleColumnLayout id="fcl"
+    layout="{= ${plantModel>/visible} ? 'TwoColumnsMidExpanded' : 'OneColumn'}"
+    backgroundDesign="Solid"
+  >
 
-    <!-- TITRE -->
-    <f:title>
-      <f:DynamicPageTitle>
-        <f:heading>
-          <Title text="{i18n>appTitle}" level="H2" />
-        </f:heading>
-      </f:DynamicPageTitle>
-    </f:title>
+    <!-- ═══════════════════════════════════════════════════
+         COLONNE GAUCHE — Critères + Liste articles
+    ════════════════════════════════════════════════════ -->
+    <f:beginColumnPages>
+      <f:DynamicPage id="dynamicPage" headerExpanded="true" toggleHeaderOnTitleClick="true" fitContent="true">
 
-    <!-- CRITÈRES -->
-    <f:header>
-      <f:DynamicPageHeader pinnable="true">
-        <l:Grid defaultSpan="L4 M6 S12" class="sapUiSmallMarginTop">
-          <l:content>
-            <VBox>
-              <Label text="{i18n>productFrom}" labelFor="productFrom" />
-              <Input id="productFrom" value="{viewModel>/productFrom}"
-                placeholder="{i18n>productFromPlaceholder}" maxLength="40" submit=".onSearch" />
-            </VBox>
-            <VBox>
-              <Label text="{i18n>productTo}" labelFor="productTo" />
-              <Input id="productTo" value="{viewModel>/productTo}"
-                placeholder="{i18n>productToPlaceholder}" maxLength="40" submit=".onSearch" />
-            </VBox>
-            <VBox>
-              <Label text="{i18n>language}" labelFor="language" />
-              <ComboBox id="language" selectedKey="{viewModel>/language}" width="100%">
-                <core:Item key="FR" text="FR — Français" />
-                <core:Item key="EN" text="EN — English" />
-                <core:Item key="DE" text="DE — Deutsch" />
-                <core:Item key="ES" text="ES — Español" />
-                <core:Item key="IT" text="IT — Italiano" />
-                <core:Item key="PT" text="PT — Português" />
-                <core:Item key="NL" text="NL — Nederlands" />
-                <core:Item key="ZH" text="ZH — 中文" />
-                <core:Item key="JA" text="JA — 日本語" />
-              </ComboBox>
-            </VBox>
-          </l:content>
-        </l:Grid>
-        <Toolbar style="Clear" class="sapUiSmallMarginBottom">
-          <ToolbarSpacer />
-          <Button type="Emphasized" icon="sap-icon://search" text="{i18n>search}" press=".onSearch" />
-          <Button icon="sap-icon://clear-all" text="{i18n>reset}" press=".onReset" />
-        </Toolbar>
-      </f:DynamicPageHeader>
-    </f:header>
+        <f:title>
+          <f:DynamicPageTitle>
+            <f:heading>
+              <Title text="{i18n>appTitle}" level="H2" />
+            </f:heading>
+          </f:DynamicPageTitle>
+        </f:title>
 
-    <!-- RÉSULTATS -->
-    <f:content>
-      <VBox class="sapUiSmallMarginTop">
+        <f:header>
+          <f:DynamicPageHeader pinnable="true">
+            <l:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">
+              <l:content>
+                <VBox>
+                  <Label text="{i18n>productFrom}" labelFor="productFrom" />
+                  <Input id="productFrom" value="{viewModel>/productFrom}"
+                    placeholder="{i18n>productFromPlaceholder}" maxLength="40" submit=".onSearch" />
+                </VBox>
+                <VBox>
+                  <Label text="{i18n>productTo}" labelFor="productTo" />
+                  <Input id="productTo" value="{viewModel>/productTo}"
+                    placeholder="{i18n>productToPlaceholder}" maxLength="40" submit=".onSearch" />
+                </VBox>
+                <VBox>
+                  <Label text="{i18n>language}" labelFor="language" />
+                  <ComboBox id="language" selectedKey="{viewModel>/language}" width="100%">
+                    <core:Item key="FR" text="FR — Français" />
+                    <core:Item key="EN" text="EN — English" />
+                    <core:Item key="DE" text="DE — Deutsch" />
+                    <core:Item key="ES" text="ES — Español" />
+                    <core:Item key="IT" text="IT — Italiano" />
+                    <core:Item key="PT" text="PT — Português" />
+                    <core:Item key="NL" text="NL — Nederlands" />
+                    <core:Item key="ZH" text="ZH — 中文" />
+                    <core:Item key="JA" text="JA — 日本語" />
+                  </ComboBox>
+                </VBox>
+              </l:content>
+            </l:Grid>
+            <Toolbar style="Clear" class="sapUiSmallMarginBottom">
+              <ToolbarSpacer />
+              <Button type="Emphasized" icon="sap-icon://search" text="{i18n>search}" press=".onSearch" />
+              <Button icon="sap-icon://clear-all" text="{i18n>reset}" press=".onReset" />
+            </Toolbar>
+          </f:DynamicPageHeader>
+        </f:header>
 
-        <MessageStrip
-          visible="{= ${viewModel>/totalCount} === -1}"
-          text="{i18n>noSearchDescription}"
-          type="Information" showIcon="true" showCloseButton="false"
-          class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginBottom"
-        />
+        <f:content>
+          <VBox class="sapUiSmallMarginTop">
 
-        <!-- Barre comptage -->
-        <Toolbar visible="{= ${viewModel>/totalCount} >= 0}" style="Clear">
-          <Title text="{parts:[{path:'viewModel>/totalCount'}], formatter:'.formatResultCount'}" level="H5" />
-          <ToolbarSpacer />
-          <Button
-            icon="sap-icon://ai"
-            text="Analyse IA"
-            type="Ghost"
-            press=".onAnalyze"
-            visible="{= ${viewModel>/totalCount} > 1}"
-            tooltip="Analyser les désignations"
-          />
-          <Button icon="sap-icon://excel-attachment" text="{i18n>export}" press=".onExport"
-            visible="{= ${viewModel>/totalCount} > 0}" />
-        </Toolbar>
+            <MessageStrip
+              visible="{= ${viewModel>/totalCount} === -1}"
+              text="{i18n>noSearchDescription}"
+              type="Information" showIcon="true" showCloseButton="false"
+              class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginBottom"
+            />
 
-        <!-- Tableau articles : clic sur une ligne charge les divisions -->
-        <Table id="resultsTable"
-          items="{viewModel>/results}"
-          growing="true" growingThreshold="50"
-          noDataText="{viewModel>/noDataText}"
-          busyIndicatorDelay="0"
-          sticky="ColumnHeaders"
-          mode="SingleSelectMaster"
-          selectionChange=".onSelectArticle"
-        >
-          <columns>
-            <Column width="14rem"><Text text="{i18n>colProduct}" /></Column>
-            <Column><Text text="{i18n>colDescription}" /></Column>
-            <Column width="5rem" hAlign="Center"><Text text="{i18n>colLanguage}" /></Column>
-          </columns>
-          <items>
-            <ColumnListItem type="Active">
-              <cells>
-                <ObjectIdentifier title="{viewModel>Product}" />
-                <Text text="{viewModel>ProductDescription}" />
-                <ObjectStatus text="{viewModel>Language}" state="Information" />
-              </cells>
-            </ColumnListItem>
-          </items>
-        </Table>
+            <Toolbar visible="{= ${viewModel>/totalCount} >= 0}" style="Clear">
+              <Title text="{parts:[{path:'viewModel>/totalCount'}], formatter:'.formatResultCount'}" level="H5" />
+              <ToolbarSpacer />
+              <Button icon="sap-icon://ai" text="Analyse IA" type="Ghost"
+                press=".onAnalyze" visible="{= ${viewModel>/totalCount} > 1}" />
+              <Button icon="sap-icon://excel-attachment" text="{i18n>export}" press=".onExport"
+                visible="{= ${viewModel>/totalCount} > 0}" />
+            </Toolbar>
 
-        <!-- Panneau divisions — s'affiche sous le tableau après sélection -->
-        <Panel
-          visible="{plantModel>/visible}"
-          class="sapUiMediumMarginTop"
-          expandable="false"
-        >
-          <headerToolbar>
-            <Toolbar>
+            <Table id="resultsTable"
+              items="{viewModel>/results}"
+              growing="true" growingThreshold="50"
+              noDataText="{viewModel>/noDataText}"
+              busyIndicatorDelay="0"
+              sticky="ColumnHeaders"
+              mode="SingleSelectMaster"
+              selectionChange=".onSelectArticle"
+            >
+              <columns>
+                <Column><Text text="{i18n>colProduct}" /></Column>
+                <Column><Text text="{i18n>colDescription}" /></Column>
+              </columns>
+              <items>
+                <ColumnListItem type="Active">
+                  <cells>
+                    <ObjectIdentifier title="{viewModel>Product}" />
+                    <Text text="{viewModel>ProductDescription}" />
+                  </cells>
+                </ColumnListItem>
+              </items>
+            </Table>
+
+          </VBox>
+        </f:content>
+
+      </f:DynamicPage>
+    </f:beginColumnPages>
+
+    <!-- ═══════════════════════════════════════════════════
+         COLONNE DROITE — Détail divisions
+    ════════════════════════════════════════════════════ -->
+    <f:midColumnPages>
+      <f:DynamicPage id="detailPage" fitContent="true">
+
+        <f:title>
+          <f:DynamicPageTitle>
+            <f:heading>
               <Title
                 text="{parts:[{path:'plantModel>/product'},{path:'plantModel>/description'}], formatter:'.formatPlantPanelTitle'}"
-                level="H5"
+                level="H3"
               />
-              <ToolbarSpacer />
-              <Text text="{parts:[{path:'plantModel>/plants'}], formatter:'.formatPlantCount'}" />
-            </Toolbar>
-          </headerToolbar>
-          <content>
+            </f:heading>
+            <f:actions>
+              <Button icon="sap-icon://decline" type="Transparent"
+                tooltip="Fermer" press=".onCloseDetail" />
+            </f:actions>
+          </f:DynamicPageTitle>
+        </f:title>
+
+        <f:content>
+          <VBox class="sapUiSmallMarginTop">
             <BusyIndicator visible="{plantModel>/loading}" class="sapUiSmallMargin" />
             <Table
               visible="{= !${plantModel>/loading}}"
               items="{plantModel>/plants}"
               noDataText="{i18n>noPlants}"
               backgroundDesign="Transparent"
+              sticky="ColumnHeaders"
             >
               <columns>
-                <Column width="8rem"><Text text="{i18n>colPlant}" /></Column>
-                <Column width="10rem"><Text text="{i18n>colMRPType}" /></Column>
-                <Column width="10rem"><Text text="{i18n>colLotSize}" /></Column>
-                <Column width="8rem" hAlign="End"><Text text="{i18n>colStock}" /></Column>
-                <Column width="6rem" hAlign="End" />
+                <Column width="6rem"><Text text="{i18n>colPlant}" /></Column>
+                <Column width="5rem"><Text text="{i18n>colMRPType}" /></Column>
+                <Column width="5rem"><Text text="{i18n>colLotSize}" /></Column>
+                <Column hAlign="End"><Text text="{i18n>colStock}" /></Column>
+                <Column width="3rem" />
               </columns>
               <items>
                 <ColumnListItem>
@@ -151,16 +161,16 @@
                       number="{plantModel>StockText}"
                       state="{= ${plantModel>Stock} > 0 ? 'Success' : ${plantModel>Stock} === 0 ? 'Error' : 'None'}"
                     />
-                    <Button icon="sap-icon://edit" type="Transparent" tooltip="{i18n>edit}" press=".onEditPlant" />
+                    <Button icon="sap-icon://edit" type="Transparent" tooltip=".{i18n>edit}" press=".onEditPlant" />
                   </cells>
                 </ColumnListItem>
               </items>
             </Table>
-          </content>
-        </Panel>
+          </VBox>
+        </f:content>
 
-      </VBox>
-    </f:content>
+      </f:DynamicPage>
+    </f:midColumnPages>
 
-  </f:DynamicPage>
+  </f:FlexibleColumnLayout>
 </mvc:View>

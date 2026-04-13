@@ -89,8 +89,6 @@ sap.ui.define([
           oModel.setProperty("/results", aResults);
           oModel.setProperty("/totalCount", aResults.length);
           oTable.setBusy(false);
-          // Scroller vers le tableau des résultats
-          this.byId("resultsTable").getDomRef() && this.byId("resultsTable").getDomRef().scrollIntoView({ behavior: "smooth" });
         }.bind(this))
         .catch(function (e) {
           oTable.setBusy(false);
@@ -243,11 +241,11 @@ sap.ui.define([
             var valText  = price > 0
               ? value.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency
               : "—";
-            mAllStock[o.product][sPlant] = { qtyText: qtyText, valText: valText };
+            mAllStock[o.product][sPlant] = { qtyText: qtyText, valText: valText, rawValue: value };
           });
         });
 
-        // Enrichir chaque paire de doublons
+        // Enrichir chaque paire de doublons et calculer la valeur totale
         oResult.duplicates.forEach(function (p) {
           p.a.plants = mAllStock[p.a.product] || {};
           p.b.plants = mAllStock[p.b.product] || {};
@@ -257,7 +255,18 @@ sap.ui.define([
           p.b.stockSummary = Object.keys(p.b.plants).map(function (pl) {
             return pl + ": " + p.b.plants[pl].qtyText + " (" + p.b.plants[pl].valText + ")";
           }).join(" | ") || "—";
+
+          // Valeur totale de la paire (pour le tri)
+          p._totalValue = 0;
+          [p.a, p.b].forEach(function (side) {
+            Object.keys(side.plants).forEach(function (pl) {
+              p._totalValue += side.plants[pl].rawValue || 0;
+            });
+          });
         });
+
+        // Trier par valeur stock décroissante
+        oResult.duplicates.sort(function (x, y) { return y._totalValue - x._totalValue; });
 
         oAM.setProperty("/totalAnalyzed", oResult.totalAnalyzed);
         oAM.setProperty("/generics",      oResult.generics);
@@ -292,6 +301,11 @@ sap.ui.define([
           oDialog.open();
         });
       }.bind(this));
+    },
+
+    onCloseDetail: function () {
+      this.getView().getModel("plantModel").setProperty("/visible", false);
+      this.byId("resultsTable").removeSelections(true);
     },
 
     onCloseAnalysis: function () {
